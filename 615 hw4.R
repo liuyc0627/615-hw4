@@ -1,0 +1,77 @@
+library(devtools)
+
+devtools::install_github("Truenumbers/tnum/tnum")
+
+library(tnum)
+library(kableExtra)
+library(dplyr)
+library(gutenbergr)
+library(tidytext)
+library(textdata)
+library(janeaustenr)
+library(stringr)
+cat(system("ping mssp1.bu.edu", intern = TRUE), sep="<br>") %>%  kable()
+gut<-gutenberg_works()
+gd <- gutenberg_download(158)
+get_sentiments("afinn")
+get_sentiments("bing")
+get_sentiments("nrc")
+
+tidy_books <- austen_books() %>%
+  group_by(book) %>%
+  mutate(
+    linenumber = row_number(),
+    chapter = cumsum(str_detect(text, 
+                                regex("^chapter [\\divxlc]", 
+                                      ignore_case = TRUE)))) %>%
+  ungroup() %>%
+  unnest_tokens(word, text)
+
+nrc_joy <- get_sentiments("nrc") %>% 
+  filter(sentiment == "joy")
+tidy_books %>%
+  filter(book == "Emma") %>%
+  inner_join(nrc_joy) %>%
+  count(word, sort = TRUE)
+jane_austen_sentiment <- tidy_books %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(book, index = linenumber %/% 80, sentiment) %>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>% 
+  mutate(sentiment = positive - negative)
+library(ggplot2)
+ggplot(jane_austen_sentiment, aes(index, sentiment, fill = book)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~book, ncol = 2, scales = "free_x")
+
+
+
+library(sentimentr)
+sentiment(gd$text)
+sentiment_by(gd$text, by = NULL)
+profanity(gd$text)
+debates <- gd
+debates_with_pol <- debates %>% 
+  get_sentences() %>% 
+  sentiment() %>% 
+  mutate(polarity_level = ifelse(sentiment < 0.2, "Negative",
+                                 ifelse(sentiment > 0.2, "Positive","Neutral")))
+debates_with_pol %>% filter(polarity_level == "Negative") %>% View()
+debates_with_senti <- ggplot() + geom_boxplot(aes(y = person, x = sentiment))
+debates %>% 
+  get_sentences() %>% 
+  sentiment_by(by = NULL) %>% #View()
+  ggplot() + geom_density(aes(ave_sentiment))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
